@@ -40,6 +40,7 @@ namespace SamDriver.Decal
             serializedObject.Update();
 
             ProjectMeshButtonGUI(primaryItem, items, isEditingMultipleObjects);
+            TargetAndProjectButtonGUI(primaryItem, items, isEditingMultipleObjects);
             ResetMeshButtonGUI(primaryItem, items, isEditingMultipleObjects);
             ScaleToMatchButtonGUI(primaryItem, items, isEditingMultipleObjects);
             DecalPickerGUI(primaryItem, items, isEditingMultipleObjects);
@@ -121,6 +122,73 @@ namespace SamDriver.Decal
                 {
                     EditorGUILayout.HelpBox("Decal mesh is currently empty so the decal is invisible.\nPlace this object so that the bounding box intersects at least one targetted mesh then click \"Generate Mesh\"",
                       MessageType.Warning);
+                }
+            }
+        }
+
+        private static Vector3[] kUnitBox =
+        {
+            // top verts
+            new Vector3(-0.5f, 0.5f, 0.5f), new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.5f, 0.5f, -0.5f),
+            // bottom verts
+            new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(0.5f, -0.5f, 0.5f), new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.5f, -0.5f, -0.5f),
+        };
+        
+        void TargetAndProjectButtonGUI(DecalMesh primaryItem, DecalMesh[] items, bool isEditingMultipleObjects)
+        {
+            if (GUILayout.Button("Retarget and Project mesh"))
+            {
+                var meshRenderers = FindObjectsOfType<MeshRenderer>();
+
+                if (meshRenderers.Length == 0)
+                {
+                    Debug.LogError("No rendered meshes in scene to project against!");
+                }
+                else
+                {
+                    foreach (var item in items)
+                    {
+                        // generate bounds of the decal
+                        var xform = item.transform;
+                        var center = xform.position;
+                        var extents = new Vector3(-float.MaxValue, -float.MaxValue, -float.MaxValue);
+                        foreach (var boxPoint in kUnitBox)
+                        {
+                            var xformdPt = xform.TransformPoint(boxPoint);
+                            extents.x = Mathf.Max(extents.x, xformdPt.x);
+                            extents.y = Mathf.Max(extents.y, xformdPt.y);
+                            extents.z = Mathf.Max(extents.z, xformdPt.z);
+                        }
+
+                        var bounds = new Bounds(center, extents - center);
+                    
+                        // find all meshes that intersect with this decal
+                        var targetMeshes = new List<MeshFilter>();
+                        var decalMesh = item.GetComponent<MeshFilter>();
+
+                        foreach (var renderer in meshRenderers)
+                        {
+                            var meshFilter = renderer.GetComponent<MeshFilter>();
+                            if (meshFilter != null && meshFilter != decalMesh && meshFilter.sharedMesh != null && bounds.Intersects(renderer.bounds))
+                            {
+                                targetMeshes.Add(meshFilter);
+                            }
+                        }
+
+                        if (targetMeshes.Count == 0)
+                        {
+                            Debug.LogError("Mesh Decal does not intersect with any meshes in scene!", item);
+                        }
+                        else
+                        {
+                            // set our target mesh list
+                            item.MeshesToProjectAgainst = targetMeshes;
+                            item.ShouldUseSceneStaticMeshes = false;
+                    
+                            // project!
+                            item.GenerateProjectedMeshImmediate();
+                        }
+                    }
                 }
             }
         }
