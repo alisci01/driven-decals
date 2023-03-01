@@ -163,7 +163,7 @@ namespace SamDriver.Decal
                         var bounds = new Bounds(center, extents - center);
                     
                         // find all meshes that intersect with this decal
-                        var targetMeshes = new List<MeshFilter>();
+                        var targetMeshes = new System.Collections.Generic.List<MeshFilter>();
                         var decalMesh = item.GetComponent<MeshFilter>();
 
                         foreach (var renderer in meshRenderers)
